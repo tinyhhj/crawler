@@ -1,8 +1,4 @@
-import requests
 from zigbang import *
-import json
-import os
-import shutil
 
 # # get room ids
 # os.makedirs('./{}'.format('zigbang'), exist_ok=True)
