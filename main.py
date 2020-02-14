@@ -31,9 +31,14 @@ from zigbang import *
 #             shutil.copyfileobj(requests.get(image, params={'w':256}, stream=True).raw, img)
 #             total += 1
 
+#wyd7f
+#wydmd
+#wydm0-7
 
+#'wyd','wye','wy6','wy7'
+#0123456789bcfdgeuskhvtmjywqnzxrp
 zb = ZigBangCrawler()
-zb.crawling(['wyd7f'])
+zb.crawling(['wydm' + i for i in '89bcfgeuskhvtmjywqnzxrp'],width=256, height=256)
 
 
 

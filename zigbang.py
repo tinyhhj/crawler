@@ -78,7 +78,22 @@ class ZigBangCrawler:
                 for h1 in hashes:
                     for h2 in hashes:
                         geohashes.append(hash+h1+h2)
-        print('searching hashes {}'.format(geohashes))
+        else:
+            new_geohashes = []
+            hashes = '0123456789bcfdgeuskhvtmjywqnzxrp'
+            for hash in geohashes:
+                if len(hash) ==5:
+                    new_geohashes.append(hash)
+                    continue
+                for h1 in hashes:
+                    if len(hash+h1) ==5:
+                        new_geohashes.append(hash+h1)
+                        continue
+                    for h2 in hashes:
+                        new_geohashes.append(hash+h1+h2)
+            geohashes = new_geohashes
+
+        print('searching hashes {} {}'.format(len(geohashes), geohashes))
         # collect ids
         ids = []
         for hash in geohashes:
@@ -104,18 +119,17 @@ class ZigBangCrawler:
             try:
                 itemInfo = requests.get(item_host.format(id)).json()
                 for i, image in enumerate(itemInfo['item']['images']):
+                    # file exists skip
+                    filename = './{}/{}_{}.{}'.format('zigbang', id, i, os.path.splitext(image)[1][1:])
+                    if os.path.exists(filename):
+                        print('{} is exists skip downloading..'.format(filename))
+                        continue
                     print('{}: Downloading... {}'.format(total, image))
-                    with open('./{}/{}_{}.{}'.format('zigbang', id, i, os.path.splitext(image)[1][1:]),
-                              'wb') as img:
+                    with open(filename,'wb') as img:
                         shutil.copyfileobj(requests.get(image, params={'w': width, 'h': height}, stream=True).raw, img)
                 total += 1
             except Exception as e:
                 print('error occur {} moving next id'.format(id))
                 print(e)
                 continue
-
-
-
-
-
 
