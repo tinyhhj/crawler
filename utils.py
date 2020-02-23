@@ -12,7 +12,7 @@ debug = True
 logging.basicConfig(level = logging.DEBUG if debug else logging.INFO)
 
 
-def masking(device,images,th= 0.3, min_sat = 0.3):
+def masking(device,images,names,th= 0.3, min_sat = 0.3):
     """
     random object masking from image
     :param image: tensor image (c,h,w)
@@ -21,15 +21,19 @@ def masking(device,images,th= 0.3, min_sat = 0.3):
     batch_size = images.size()[0]
     h = images.size()[2]
     w = images.size()[3]
-    result_masks = torch.zeros((batch_size,h,w),dtype=torch.uint8,device=device)
+    result_masks = []
 
     model  = models.detection.maskrcnn_resnet50_fpn(pretrained=True).to(device)
 
     model.eval()
     results = model(images.to(device))
+    new_names = []
 
-    for i,result in enumerate(results):
-        logging.debug(result['masks'].size())
+    for i,(result,name) in enumerate(zip(results,names)):
+
+        # nothing to detect
+        if len(result['masks']) == 0:
+            continue
         # UInt8Tensor[N, 1, H, W]
         masks = result['masks'].squeeze() >= th
         sub_masks = masks
@@ -43,9 +47,12 @@ def masking(device,images,th= 0.3, min_sat = 0.3):
                     break
 
         logging.debug('min_sat: {}, sub_masks: {}'.format(min_sat, sub_masks.max(0)[0].sum().float() / (h*w)))
-        for m in sub_masks:
-            result_masks[i,:,:] = torch.where(m, torch.tensor(255,device=device,dtype=torch.uint8), result_masks[i,:,:])
-    return result_masks.to('cpu')
+
+        result_masks.append((sub_masks.max(0)[0].byte()* 255).unsqueeze(0))
+        new_names.append(name)
+    result_masks = torch.cat(result_masks)
+
+    return result_masks, new_names
 
 def load_flist(flist):
     if os.path.isfile(flist):
@@ -60,6 +67,7 @@ def save_masks(output, flist, masks):
 
 def preprocess(device,batch):
     images = []
+    names = []
     for img in batch:
         try:
             image = Image.open(img)
@@ -67,10 +75,11 @@ def preprocess(device,batch):
             logging.debug('cant open {}'.format(img))
             continue
         images.append(np.transpose(np.array(image),(2,0,1)))
+        names.append(img)
     images = np.array(images)
-    result = torch.cat((torch.from_numpy(images).to(device=device).float(),)) / 255
+    result = torch.from_numpy(images).to(device=device).float() / 255
     print(result.size())
-    return result
+    return result,names
 def mask(input = None, output = None):
     parser = argparse.ArgumentParser()
     parser.add_argument('--path', type=str, help='input images to mask',default = None)
@@ -91,10 +100,13 @@ def mask(input = None, output = None):
     for f in range(0,len(files),args.size):
         batch = files[f:f+args.size]
         # open이 안됐을 경우에 mask와 mapping 어그러짐
-        images = preprocess(device,batch)
+        images,names = preprocess(device,batch)
+        assert len(images) == len(names)
         # mask를 dectection못했을 경우에 sum reduction 불가
-        masks = masking(device,images)
-        save_masks(args.output, batch, masks.numpy())
+        masks,names = masking(device,images,names)
+        assert len(masks) == len(names)
+
+        save_masks(args.output, names, masks.numpy())
 
 
 if __name__ =='__main__':
